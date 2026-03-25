@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Business School — A-Level Business Simulation</title>
+<meta name="description" content="Interactive multiplayer business simulation for A-Level Business Studies. Run a company, compete with classmates, and learn real business concepts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<!-- ═══ Notification Area ═══ -->
+<div class="notif-area" id="notifArea"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: LOADING
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-loading" class="screen active">
+  <div class="load-logo">The Business <span class="accent">School</span></div>
+  <div class="load-sub">A-Level Business Studies &middot; Sixth Form Edition</div>
+  <div class="load-bar"><div class="load-bar-inner" id="loadBar"></div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: LOGIN — Choose Role
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-login" class="screen">
+  <div class="login-wrap">
+    <div class="login-brand">The Business <span class="accent">School</span></div>
+    <div class="login-tagline">Sixth Form &middot; Interactive Business Simulation</div>
+
+    <!-- Role Selection -->
+    <div id="login-roles">
+      <div class="role-cards">
+        <div class="role-card" onclick="pickTeacher()">
+          <span class="icon">&#x1F3EB;</span>
+          <span class="label">I'm a Teacher</span>
+          <span class="hint">Create a session and project the Game PIN for your class</span>
+        </div>
+        <div class="role-card" onclick="pickStudent()">
+          <span class="icon">&#x1F393;</span>
+          <span class="label">I'm a Student</span>
+          <span class="hint">Enter your teacher's Game PIN to join the session</span>
+        </div>
+      </div>
+      <div class="login-footer">Business Studies &middot; A-Level &middot; No signup needed</div>
+      <div class="demo-link"><button class="btn-demo" onclick="startDemoMode()">&#x1F3AC; Watch Demo &mdash; See the game in action</button></div>
+    </div>
+
+    <!-- Teacher Password -->
+    <div id="login-teacher" class="panel hidden">
+      <button class="btn-back" onclick="showRoles()">&#8592; Back</button>
+      <div class="panel-title">Teacher Access</div>
+      <div class="panel-sub">Enter the teacher password to create a session.</div>
+      <label class="form-label" for="teacherPw">Password</label>
+      <input id="teacherPw" type="password" class="form-input" placeholder="Enter password" autocomplete="off" onkeydown="if(event.key==='Enter')teacherLogin()">
+      <div class="form-error" id="teacherPwErr"></div>
+      <button class="btn btn-gold w-full mt-2" onclick="teacherLogin()" id="teacherLoginBtn">Continue &rarr;</button>
+    </div>
+
+    <!-- Student PIN Entry -->
+    <div id="login-student-pin" class="panel hidden">
+      <button class="btn-back" onclick="showRoles()">&#8592; Back</button>
+      <div class="panel-title">Enter Game PIN</div>
+      <div class="panel-sub">Your teacher has a 6-digit PIN on the board. Enter it here to join.</div>
+      <label class="form-label" for="pinInput">Game PIN</label>
+      <input id="pinInput" type="text" inputmode="numeric" class="form-input pin-input" placeholder="000000" maxlength="6" autocomplete="off" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)" onkeydown="if(event.key==='Enter')enterPin()">
+      <div class="form-error" id="pinErr"></div>
+      <button class="btn btn-gold w-full mt-2" onclick="enterPin()" id="pinBtn">Continue &rarr;</button>
+    </div>
+
+    <!-- Student Name Entry -->
+    <div id="login-student-name" class="panel hidden">
+      <button class="btn-back" onclick="showPinEntry()">&#8592; Back</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="color:var(--green-400);font-weight:700;">&#10003; PIN accepted</span>
+        <span class="font-mono text-gold" id="pinDisplay"></span>
+      </div>
+      <div class="panel-title">Choose a Nickname</div>
+      <div class="panel-sub">This name will appear on the class leaderboard.</div>
+      <label class="form-label" for="nameInput">Nickname</label>
+      <input id="nameInput" type="text" class="form-input" placeholder="e.g. Alex" maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter')joinGame()">
+      <div class="form-error" id="nameErr"></div>
+      <button class="btn btn-gold w-full mt-2" onclick="joinGame()" id="joinBtn">Join Game &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: LOBBY (Teacher sees this while students join)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+  <div class="lobby-wrap">
+    <div class="lobby-pin-box">
+      <div class="lobby-pin-label">Game PIN</div>
+      <div class="lobby-pin" id="lobbyPin">------</div>
+      <div class="lobby-qr" id="lobbyQr"></div>
+      <div class="lobby-join-url" id="lobbyUrl"></div>
+    </div>
+
+    <div class="lobby-players">
+      <div class="lobby-players-header">
+        <span class="lobby-players-title">Players Joined</span>
+        <span class="lobby-players-count" id="lobbyCount">0</span>
+      </div>
+      <div id="lobbyList" class="lobby-player-list">
+        <div class="lobby-empty">Waiting for students to join...</div>
+      </div>
+    </div>
+
+    <div class="lobby-controls">
+      <button class="btn btn-gold" id="lobbyStartBtn" onclick="startGame()" disabled>Start Game</button>
+      <button class="btn btn-outline" onclick="copyPin()">Copy PIN</button>
+      <button class="btn btn-outline" onclick="openProjector()">Projector View</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: STUDENT WAITING (before game starts)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen">
+  <div class="waiting-pulse"></div>
+  <h2>You're in!</h2>
+  <p class="text-muted mt-1" id="waitingName">Waiting for your teacher to start the game...</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: STUDENT GAME
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-layout">
+    <!-- Top Bar -->
+    <div class="game-topbar">
+      <div class="topbar-brand">The Business <span class="accent">School</span></div>
+      <div class="topbar-info">
+        <div class="topbar-stat">
+          <div class="topbar-stat-value text-gold" id="topBalance">£10,000</div>
+          <div class="topbar-stat-label">Balance</div>
+        </div>
+        <div class="topbar-stat">
+          <div class="topbar-stat-value" id="topProfit">£0</div>
+          <div class="topbar-stat-label">Profit</div>
+        </div>
+        <div class="topbar-stat">
+          <div class="topbar-stat-value" id="topRank">#-</div>
+          <div class="topbar-stat-label">Rank</div>
+        </div>
+        <span class="topbar-round" id="topRound">Round 1</span>
+        <span class="topbar-timer" id="topTimer">--:--</span>
+      </div>
+    </div>
+
+    <!-- Sidebar: Player Overview -->
+    <div class="game-sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Your Balance</div>
+        <div class="sidebar-balance" id="sideBalance">£10,000</div>
+        <div class="sidebar-pnl" id="sidePnl">£0 profit</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Your Inventory</div>
+        <div id="sideInventory">
+          <div class="text-muted text-sm">No stock yet — buy from the market!</div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">VAT Account</div>
+        <div class="text-sm">
+          <div class="flex justify-between"><span class="text-muted">Total VAT</span><span class="font-mono" id="sideVatCollected">£0</span></div>
+          <div class="flex justify-between mt-1"><span class="text-muted">Paid to HMRC</span><span class="font-mono" id="sideVatPaid">£0</span></div>
+          <div class="flex justify-between mt-1"><span class="text-muted">Owed</span><span class="font-mono text-gold" id="sideVatOwed">£0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="game-main">
+      <!-- Crisis Banner (shown when active) -->
+      <div id="gameCrisis" class="crisis-banner hidden">
+        <span class="icon" id="crisisIcon">&#x26A0;</span>
+        <div>
+          <div class="title" id="crisisTitle">Crisis!</div>
+          <div class="desc" id="crisisDesc">Something happened in the market...</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('market')" id="tab-market">Market</button>
+        <button class="tab" onclick="switchTab('pricing')" id="tab-pricing">My Prices</button>
+        <button class="tab" onclick="switchTab('city')" id="tab-city">My City</button>
+        <button class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Leaderboard</button>
+        <button class="tab" onclick="switchTab('sales')" id="tab-sales">Sales Log</button>
+      </div>
+
+      <!-- Tab: Market -->
+      <div id="panel-market" class="tab-panel">
+        <div class="market-grid" id="marketGrid">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+      <!-- Tab: My Prices -->
+      <div id="panel-pricing" class="tab-panel hidden">
+        <div class="pricing-grid" id="pricingGrid">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+      <!-- Tab: City View -->
+      <div id="panel-city" class="tab-panel hidden">
+        <div class="city-container" id="cityView">
+          <!-- Filled by JS: isometric city visualization -->
+        </div>
+      </div>
+
+      <!-- Tab: Leaderboard -->
+      <div id="panel-leaderboard" class="tab-panel hidden">
+        <div class="leaderboard" id="leaderboard">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+      <!-- Tab: Sales Log -->
+      <div id="panel-sales" class="tab-panel hidden">
+        <div id="salesLog" class="report-section">
+          <div class="text-muted text-sm">No sales yet. Set your prices and wait for customers!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: TEACHER DASHBOARD
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-teacher" class="screen">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;max-width:1400px;margin-left:auto;margin-right:auto;">
+    <div>
+      <h2>Teacher Dashboard</h2>
+      <div class="text-muted text-sm">PIN: <span class="font-mono text-gold" id="teacherPin">------</span> &middot; <span id="teacherStatus" class="status-badge live"><span class="status-dot"></span> Live</span></div>
+    </div>
+    <div class="flex gap-1 items-center">
+      <span class="topbar-timer font-mono" id="teacherTimer" style="margin-right:8px;">--:--</span>
+      <button class="btn btn-outline btn-sm" onclick="openProjector()">Projector View</button>
+      <button class="btn btn-outline btn-sm" onclick="togglePause()" id="pauseBtn">Pause &amp; Discuss</button>
+      <button class="btn btn-outline btn-sm" onclick="advanceRound()">Next Round</button>
+      <button class="btn btn-danger btn-sm" onclick="endGame()">End Game</button>
+    </div>
+  </div>
+
+  <div class="teacher-layout" id="teacherContent">
+    <!-- Game Controls -->
+    <div class="teacher-card">
+      <div class="teacher-card-title">Crisis Events</div>
+      <div class="teacher-controls" id="crisisControls">
+        <button class="crisis-btn" onclick="triggerCrisis('supply')">&#x1F6A2; Supply Crisis</button>
+        <button class="crisis-btn" onclick="triggerCrisis('demand')">&#x1F4C8; Demand Boom</button>
+        <button class="crisis-btn" onclick="triggerCrisis('tax')">&#x1F4B0; Tax Hike</button>
+        <button class="crisis-btn" onclick="triggerCrisis('competition')">&#x1F3ED; New Competitor</button>
+        <button class="crisis-btn" onclick="triggerCrisis('viral')">&#x1F525; Viral Product</button>
+        <button class="crisis-btn" onclick="triggerCrisis('recession')">&#x1F4C9; Recession</button>
+        <button class="crisis-btn" onclick="triggerCrisis('clear')" style="border-color:var(--green-400);color:var(--green-400);">&#x2705; Clear Crisis</button>
+      </div>
+    </div>
+
+    <!-- Class Overview -->
+    <div class="teacher-card">
+      <div class="teacher-card-title">Class Overview</div>
+      <div id="teacherOverview">
+        <div class="text-muted text-sm">Waiting for game data...</div>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="teacher-card" style="grid-column: 1 / -1;">
+      <div class="teacher-card-title">Live Leaderboard</div>
+      <div id="teacherLeaderboard">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- Teacher Guide -->
+    <div class="teacher-card" style="grid-column: 1 / -1;">
+      <div class="teacher-card-title">Lesson Guide</div>
+      <div id="teacherGuide" class="text-sm text-muted" style="line-height:1.8;"></div>
+    </div>
+
+    <!-- Reports -->
+    <div class="teacher-card" style="grid-column: 1 / -1;">
+      <div class="teacher-card-title">Reports</div>
+      <div class="flex gap-1">
+        <button class="btn btn-outline btn-sm" onclick="generateClassReport()">Generate Class Report (AI)</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClassCSV()">Export Results (CSV)</button>
+        <button class="btn btn-outline btn-sm" onclick="printClassReport()">Print Class Report</button>
+      </div>
+      <div id="classReportArea" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: PROJECTOR VIEW
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-projector" class="screen">
+  <div class="projector-header">
+    <div class="login-brand">The Business <span class="accent">School</span></div>
+    <div class="projector-pin">PIN: <span id="projectorPin">------</span></div>
+    <div class="projector-round" id="projectorRound">Round 1</div>
+    <div id="projectorCrisis" class="crisis-banner hidden mt-2" style="max-width:600px;margin-left:auto;margin-right:auto;">
+      <span class="icon" id="projCrisisIcon">&#x26A0;</span>
+      <div>
+        <div class="title" id="projCrisisTitle">Crisis!</div>
+        <div class="desc" id="projCrisisDesc"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- News Ticker -->
+  <div class="news-ticker" id="projectorTicker">
+    <div class="news-ticker-inner" id="tickerContent"></div>
+  </div>
+
+  <!-- Profit Margin Bar Chart -->
+  <div class="chart-container">
+    <div class="teacher-card-title">Company Profit Margins — Live</div>
+    <div id="projectorChart">
+      <!-- Filled by JS: horizontal bar chart -->
+    </div>
+  </div>
+
+  <!-- Detail Table -->
+  <table class="projector-table" id="projectorTable">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Company</th>
+        <th>Revenue</th>
+        <th>Costs</th>
+        <th>Profit</th>
+        <th>Margin</th>
+        <th>Balance</th>
+      </tr>
+    </thead>
+    <tbody id="projectorTableBody">
+      <!-- Filled by JS -->
+    </tbody>
+  </table>
+
+  <!-- Live Event Feed -->
+  <div class="teacher-card mt-2" style="max-height:180px;overflow-y:auto;">
+    <div class="teacher-card-title">Live Activity Feed</div>
+    <div id="projectorFeed" class="text-sm">
+      <div class="text-muted">Waiting for activity...</div>
+    </div>
+  </div>
+
+  <div class="text-center mt-3">
+    <button class="btn btn-outline btn-sm" onclick="closeProjector()">Back to Dashboard</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: QUIZ
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-quiz" class="screen" style="align-items:center;justify-content:center;">
+  <div class="quiz-wrap">
+    <h2 class="text-center mb-2">Business Knowledge Quiz</h2>
+    <p class="text-muted text-center text-sm mb-2">Test what you learned in today's simulation</p>
+    <div class="quiz-progress" id="quizProgress"></div>
+    <div class="report-section">
+      <div class="quiz-question" id="quizQuestion">Loading...</div>
+      <div class="quiz-options" id="quizOptions">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+    <div class="text-center mt-2">
+      <button class="btn btn-gold hidden" id="quizNextBtn" onclick="nextQuizQ()">Next Question &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: RESULTS (Student end-screen)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-results" class="screen">
+  <div class="results-wrap">
+    <div class="results-hero">
+      <div class="results-grade" id="resultsGrade">A</div>
+      <div class="results-grade-label" id="resultsGradeLabel">Outstanding Performance</div>
+      <div class="text-muted text-sm mt-1" id="resultsName">Player</div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="report-section">
+      <div class="report-section-title">Your Performance</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;" id="resultsStats">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- AI Report -->
+    <div class="report-section" id="resultsAiReport">
+      <div class="report-section-title">Personalised AI Report</div>
+      <div class="report-loading" id="aiReportLoading">
+        <div class="report-spinner"></div>
+        <span>Generating your personalised report...</span>
+      </div>
+      <div class="report-text hidden" id="aiReportText"></div>
+    </div>
+
+    <!-- Quiz Results -->
+    <div class="report-section">
+      <div class="report-section-title">Quiz Results</div>
+      <div id="resultsQuiz" class="text-muted text-sm">Quiz not taken</div>
+    </div>
+
+    <div class="text-center mt-3">
+      <button class="btn btn-gold" onclick="openCertificate()">View Certificate</button>
+      <button class="btn btn-outline" onclick="printReport()">Print Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: CERTIFICATE
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-certificate" class="screen" style="align-items:center;justify-content:center;">
+  <div class="cert-frame" id="certContent">
+    <div class="cert-border">
+      <div class="cert-inner">
+        <div class="cert-logo">The Business <span class="accent">School</span></div>
+        <div class="cert-title">Certificate of Achievement</div>
+        <div class="cert-subtitle">A-Level Business Studies Simulation</div>
+        <div class="cert-divider"></div>
+        <div class="cert-text">This certifies that</div>
+        <div class="cert-name" id="certName">Student Name</div>
+        <div class="cert-text">has successfully completed the Business Simulation</div>
+        <div class="cert-text">achieving the grade of</div>
+        <div class="cert-grade" id="certGrade">A</div>
+        <div class="cert-stats" id="certStats"></div>
+        <div class="cert-divider"></div>
+        <div class="cert-footer">
+          <div class="cert-date" id="certDate"></div>
+          <div class="cert-text" style="font-size:0.7rem;margin-top:4px;">The Business School &middot; Sixth Form Edition</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="text-center mt-2">
+    <button class="btn btn-gold" onclick="printCertificate()">Print Certificate</button>
+    <button class="btn btn-outline" onclick="showResults()">Back to Results</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN: GAME PAUSED (Student sees this)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="screen-paused" class="screen" style="align-items:center;justify-content:center;text-align:center;">
+  <div style="font-size:3rem;margin-bottom:16px;">&#x23F8;</div>
+  <h2>Game Paused</h2>
+  <p class="text-muted mt-1">Your teacher has paused the session.<br>Listen to the discussion — the game will resume shortly.</p>
+  <div class="pause-tips mt-3" style="max-width:500px;">
+    <div class="report-section">
+      <div class="report-section-title">Discussion Points</div>
+      <div class="text-sm text-muted" id="pauseTips">
+        Your teacher may want to discuss what's happening in the market. Think about your pricing strategy and how you could improve.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     OVERLAY: ONBOARDING (shown once when game starts)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="onboarding-overlay" class="onboarding-overlay hidden">
+  <div class="onboarding-card">
+    <div class="onboarding-step" id="obStep">
+      <div class="onboarding-icon" id="obIcon">&#x1F3EB;</div>
+      <div class="onboarding-title" id="obTitle">Welcome to The Business School!</div>
+      <div class="onboarding-text" id="obText">You're about to run your own business. Buy products, set prices, and compete with your classmates for the highest profit.</div>
+    </div>
+    <div class="onboarding-progress" id="obProgress"></div>
+    <div class="onboarding-actions">
+      <button class="btn btn-outline btn-sm" id="obSkip" onclick="skipOnboarding()">Skip</button>
+      <button class="btn btn-gold" id="obNext" onclick="nextOnboarding()">Next &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     OVERLAY: TRADE FLASH (shown after buy/sell)
+     ═══════════════════════════════════════════════════════════ -->
+<div id="trade-flash" class="trade-flash hidden">
+  <div class="trade-flash-inner" id="tradeFlashContent"></div>
+</div>
+
+</body>
+</html>
